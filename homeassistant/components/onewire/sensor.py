@@ -10,6 +10,7 @@ from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.config_entries import SOURCE_IMPORT
 from homeassistant.const import CONF_HOST, CONF_PORT, CONF_TYPE
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.typing import StateType
 
 from .const import (
     CONF_MOUNT_DIR,
@@ -30,7 +31,7 @@ from .const import (
     SENSOR_TYPE_VOLTAGE,
     SENSOR_TYPE_WETNESS,
 )
-from .onewire_entities import OneWire, OneWireProxy
+from .onewire_entities import OneWireBaseEntity, OneWireProxyEntity
 from .onewirehub import OneWireHub
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,44 +46,80 @@ DEVICE_SENSORS = {
             "path": "TAI8570/temperature",
             "name": "Temperature",
             "type": SENSOR_TYPE_TEMPERATURE,
+            "default_disabled": True,
         },
-        {"path": "TAI8570/pressure", "name": "Pressure", "type": SENSOR_TYPE_PRESSURE},
+        {
+            "path": "TAI8570/pressure",
+            "name": "Pressure",
+            "type": SENSOR_TYPE_PRESSURE,
+            "default_disabled": True,
+        },
     ],
     "22": [
         {"path": "temperature", "name": "Temperature", "type": SENSOR_TYPE_TEMPERATURE}
     ],
     "26": [
         {"path": "temperature", "name": "Temperature", "type": SENSOR_TYPE_TEMPERATURE},
-        {"path": "humidity", "name": "Humidity", "type": SENSOR_TYPE_HUMIDITY},
+        {
+            "path": "humidity",
+            "name": "Humidity",
+            "type": SENSOR_TYPE_HUMIDITY,
+            "default_disabled": True,
+        },
         {
             "path": "HIH3600/humidity",
             "name": "Humidity HIH3600",
             "type": SENSOR_TYPE_HUMIDITY,
+            "default_disabled": True,
         },
         {
             "path": "HIH4000/humidity",
             "name": "Humidity HIH4000",
             "type": SENSOR_TYPE_HUMIDITY,
+            "default_disabled": True,
         },
         {
             "path": "HIH5030/humidity",
             "name": "Humidity HIH5030",
             "type": SENSOR_TYPE_HUMIDITY,
+            "default_disabled": True,
         },
         {
             "path": "HTM1735/humidity",
             "name": "Humidity HTM1735",
             "type": SENSOR_TYPE_HUMIDITY,
+            "default_disabled": True,
         },
-        {"path": "B1-R1-A/pressure", "name": "Pressure", "type": SENSOR_TYPE_PRESSURE},
+        {
+            "path": "B1-R1-A/pressure",
+            "name": "Pressure",
+            "type": SENSOR_TYPE_PRESSURE,
+            "default_disabled": True,
+        },
         {
             "path": "S3-R1-A/illuminance",
             "name": "Illuminance",
             "type": SENSOR_TYPE_ILLUMINANCE,
+            "default_disabled": True,
         },
-        {"path": "VAD", "name": "Voltage VAD", "type": SENSOR_TYPE_VOLTAGE},
-        {"path": "VDD", "name": "Voltage VDD", "type": SENSOR_TYPE_VOLTAGE},
-        {"path": "IAD", "name": "Current", "type": SENSOR_TYPE_CURRENT},
+        {
+            "path": "VAD",
+            "name": "Voltage VAD",
+            "type": SENSOR_TYPE_VOLTAGE,
+            "default_disabled": True,
+        },
+        {
+            "path": "VDD",
+            "name": "Voltage VDD",
+            "type": SENSOR_TYPE_VOLTAGE,
+            "default_disabled": True,
+        },
+        {
+            "path": "IAD",
+            "name": "Current",
+            "type": SENSOR_TYPE_CURRENT,
+            "default_disabled": True,
+        },
     ],
     "28": [
         {"path": "temperature", "name": "Temperature", "type": SENSOR_TYPE_TEMPERATURE}
@@ -241,12 +278,13 @@ def get_entities(onewirehub: OneWireHub, config):
                     os.path.split(device["path"])[0], device_sensor["path"]
                 )
                 entities.append(
-                    OneWireProxy(
+                    OneWireProxySensor(
                         device_names.get(sensor_id, sensor_id),
                         device_file,
                         device_sensor["type"],
                         device_sensor["name"],
                         device_info,
+                        device_sensor.get("default_disabled", False),
                         onewirehub.owproxy,
                     )
                 )
@@ -274,7 +312,7 @@ def get_entities(onewirehub: OneWireHub, config):
             }
             device_file = f"/sys/bus/w1/devices/{sensor_id}/w1_slave"
             entities.append(
-                OneWireDirect(
+                OneWireDirectSensor(
                     device_names.get(sensor_id, sensor_id),
                     device_file,
                     device_info,
@@ -313,7 +351,7 @@ def get_entities(onewirehub: OneWireHub, config):
                         os.path.split(family_file_path)[0], sensor_value
                     )
                     entities.append(
-                        OneWireOWFS(
+                        OneWireOWFSSensor(
                             device_names.get(sensor_id, sensor_id),
                             device_file,
                             sensor_key,
@@ -323,13 +361,27 @@ def get_entities(onewirehub: OneWireHub, config):
     return entities
 
 
-class OneWireDirect(OneWire):
+class OneWireProxySensor(OneWireProxyEntity):
+    """Implementation of a 1-Wire sensor connected through owserver."""
+
+    @property
+    def state(self) -> StateType:
+        """Return the state of the entity."""
+        return self._state
+
+
+class OneWireDirectSensor(OneWireBaseEntity):
     """Implementation of a 1-Wire sensor directly connected to RPI GPIO."""
 
     def __init__(self, name, device_file, device_info, owsensor):
         """Initialize the sensor."""
         super().__init__(name, device_file, "temperature", "Temperature", device_info)
         self._owsensor = owsensor
+
+    @property
+    def state(self) -> StateType:
+        """Return the state of the entity."""
+        return self._state
 
     def update(self):
         """Get the latest data from the device."""
@@ -346,12 +398,17 @@ class OneWireDirect(OneWire):
         self._state = value
 
 
-class OneWireOWFS(OneWire):  # pragma: no cover
+class OneWireOWFSSensor(OneWireBaseEntity):  # pragma: no cover
     """Implementation of a 1-Wire sensor through owfs.
 
     This part of the implementation does not conform to policy regarding 3rd-party libraries, and will not longer be updated.
     https://developers.home-assistant.io/docs/creating_platform_code_review/#5-communication-with-devicesservices
     """
+
+    @property
+    def state(self) -> StateType:
+        """Return the state of the entity."""
+        return self._state
 
     def _read_value_raw(self):
         """Read the value as it is returned by the sensor."""
