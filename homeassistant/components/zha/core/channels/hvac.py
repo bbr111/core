@@ -92,7 +92,6 @@ class Pump(ZigbeeChannel):
     """Pump channel."""
 
 
-@registries.CLIMATE_CLUSTERS.register(hvac.Thermostat.cluster_id)
 @registries.ZIGBEE_CHANNEL_REGISTRY.register(hvac.Thermostat.cluster_id)
 class ThermostatChannel(ZigbeeChannel):
     """Thermostat channel."""
@@ -363,7 +362,7 @@ class ThermostatChannel(ZigbeeChannel):
         )
 
     @retryable_req(delays=(1, 1, 3))
-    async def async_initialize(self, from_cache):
+    async def async_initialize_channel_specific(self, from_cache: bool) -> None:
         """Initialize channel."""
 
         cached = [a for a, cached in self._init_attrs.items() if cached]
@@ -371,7 +370,6 @@ class ThermostatChannel(ZigbeeChannel):
 
         await self._chunk_attr_read(cached, cached=True)
         await self._chunk_attr_read(uncached, cached=False)
-        await super().async_initialize(from_cache)
 
     async def async_set_operation_mode(self, mode) -> bool:
         """Set Operation mode."""
