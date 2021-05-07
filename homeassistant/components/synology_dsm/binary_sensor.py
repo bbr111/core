@@ -1,10 +1,10 @@
 """Support for Synology DSM binary sensors."""
-from typing import Dict
+from __future__ import annotations
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_DISKS
-from homeassistant.helpers.typing import HomeAssistantType
+from homeassistant.core import HomeAssistant
 
 from . import SynologyDSMBaseEntity, SynologyDSMDeviceEntity
 from .const import (
@@ -18,7 +18,7 @@ from .const import (
 
 
 async def async_setup_entry(
-    hass: HomeAssistantType, entry: ConfigEntry, async_add_entities
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ) -> None:
     """Set up the Synology NAS binary sensor."""
 
@@ -71,7 +71,7 @@ class SynoDSMSecurityBinarySensor(SynologyDSMBaseEntity, BinarySensorEntity):
         return bool(self._api.security)
 
     @property
-    def device_state_attributes(self) -> Dict[str, str]:
+    def extra_state_attributes(self) -> dict[str, str]:
         """Return security checks details."""
         return self._api.security.status_by_check
 

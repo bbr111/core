@@ -49,14 +49,28 @@ ZEROCONF = {
             "domain": "daikin"
         }
     ],
+    "_dvl-deviceapi._tcp.local.": [
+        {
+            "domain": "devolo_home_control"
+        }
+    ],
     "_elg._tcp.local.": [
         {
             "domain": "elgato"
         }
     ],
+    "_enphase-envoy._tcp.local.": [
+        {
+            "domain": "enphase_envoy"
+        }
+    ],
     "_esphomelib._tcp.local.": [
         {
             "domain": "esphome"
+        },
+        {
+            "domain": "zha",
+            "name": "tube*"
         }
     ],
     "_fbx-api._tcp.local.": [
@@ -80,6 +94,18 @@ ZEROCONF = {
         }
     ],
     "_http._tcp.local.": [
+        {
+            "domain": "nam",
+            "name": "nam-*"
+        },
+        {
+            "domain": "rachio",
+            "name": "rachio*"
+        },
+        {
+            "domain": "rainmachine",
+            "name": "rainmachine*"
+        },
         {
             "domain": "shelly",
             "name": "shelly*"
@@ -148,6 +174,15 @@ ZEROCONF = {
         {
             "domain": "smappee",
             "name": "smappee2*"
+        },
+        {
+            "domain": "smappee",
+            "name": "smappee50*"
+        }
+    ],
+    "_system-bridge._udp.local.": [
+        {
+            "domain": "system_bridge"
         }
     ],
     "_touch-able._tcp.local.": [
@@ -185,13 +220,16 @@ HOMEKIT = {
     "Healty Home Coach": "netatmo",
     "Iota": "abode",
     "LIFX": "lifx",
+    "MYQ": "myq",
     "Netatmo Relay": "netatmo",
     "PowerView": "hunterdouglas_powerview",
     "Presence": "netatmo",
     "Rachio": "rachio",
+    "SPK5": "rainmachine",
     "Smart Bridge": "lutron_caseta",
     "Socket": "wemo",
     "TRADFRI": "tradfri",
+    "Touch HD": "rainmachine",
     "Welcome": "netatmo",
     "Wemo": "wemo",
     "iSmartGate": "gogogate2",

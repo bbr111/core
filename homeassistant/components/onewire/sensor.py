@@ -1,12 +1,14 @@
 """Support for 1-Wire environment sensors."""
-from glob import glob
+from __future__ import annotations
+
+import asyncio
 import logging
 import os
 
 from pi1wire import InvalidCRCException, UnsupportResponseException
 import voluptuous as vol
 
-from homeassistant.components.sensor import PLATFORM_SCHEMA
+from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
 from homeassistant.config_entries import SOURCE_IMPORT
 from homeassistant.const import CONF_HOST, CONF_PORT, CONF_TYPE
 import homeassistant.helpers.config_validation as cv
@@ -15,7 +17,6 @@ from homeassistant.helpers.typing import StateType
 from .const import (
     CONF_MOUNT_DIR,
     CONF_NAMES,
-    CONF_TYPE_OWFS,
     CONF_TYPE_OWSERVER,
     CONF_TYPE_SYSBUS,
     DEFAULT_OWSERVER_PORT,
@@ -235,14 +236,15 @@ def get_sensor_types(device_sub_type):
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Old way of setting up 1-Wire platform."""
+    _LOGGER.warning(
+        "Loading 1-Wire via platform setup is deprecated. "
+        "Please remove it from your configuration"
+    )
+
     if config.get(CONF_HOST):
         config[CONF_TYPE] = CONF_TYPE_OWSERVER
     elif config[CONF_MOUNT_DIR] == DEFAULT_SYSBUS_MOUNT_DIR:
         config[CONF_TYPE] = CONF_TYPE_SYSBUS
-    else:  # pragma: no cover
-        # This part of the implementation does not conform to policy regarding 3rd-party libraries, and will not longer be updated.
-        # https://developers.home-assistant.io/docs/creating_platform_code_review/#5-communication-with-devicesservices
-        config[CONF_TYPE] = CONF_TYPE_OWFS
 
     hass.async_create_task(
         hass.config_entries.flow.async_init(
@@ -253,7 +255,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up 1-Wire platform."""
-    onewirehub = hass.data[DOMAIN][config_entry.unique_id]
+    onewirehub = hass.data[DOMAIN][config_entry.entry_id]
     entities = await hass.async_add_executor_job(
         get_entities, onewirehub, config_entry.data
     )
@@ -264,9 +266,8 @@ def get_entities(onewirehub: OneWireHub, config):
     """Get a list of entities."""
     entities = []
     device_names = {}
-    if CONF_NAMES in config:
-        if isinstance(config[CONF_NAMES], dict):
-            device_names = config[CONF_NAMES]
+    if CONF_NAMES in config and isinstance(config[CONF_NAMES], dict):
+        device_names = config[CONF_NAMES]
 
     conf_type = config[CONF_TYPE]
     # We have an owserver on a remote(or local) host/port
@@ -359,42 +360,19 @@ def get_entities(onewirehub: OneWireHub, config):
                 "Check the mount_dir parameter if it's defined"
             )
 
-    # We have an owfs mounted
-    else:  # pragma: no cover
-        # This part of the implementation does not conform to policy regarding 3rd-party libraries, and will not longer be updated.
-        # https://developers.home-assistant.io/docs/creating_platform_code_review/#5-communication-with-devicesservices
-        base_dir = config[CONF_MOUNT_DIR]
-        _LOGGER.debug("Initializing using OWFS %s", base_dir)
-        _LOGGER.warning(
-            "The OWFS implementation of 1-Wire sensors is deprecated, "
-            "and should be migrated to OWServer (on localhost:4304). "
-            "If migration to OWServer is not feasible on your installation, "
-            "please raise an issue at https://github.com/home-assistant/core/issues/new"
-            "?title=Unable%20to%20migrate%20onewire%20from%20OWFS%20to%20OWServer",
-        )
-        for family_file_path in glob(os.path.join(base_dir, "*", "family")):
-            with open(family_file_path) as family_file:
-                family = family_file.read()
-            if "EF" in family:
-                continue
-            if family in DEVICE_SENSORS:
-                for sensor_key, sensor_value in DEVICE_SENSORS[family].items():
-                    sensor_id = os.path.split(os.path.split(family_file_path)[0])[1]
-                    device_file = os.path.join(
-                        os.path.split(family_file_path)[0], sensor_value
-                    )
-                    entities.append(
-                        OneWireOWFSSensor(
-                            device_names.get(sensor_id, sensor_id),
-                            device_file,
-                            sensor_key,
-                        )
-                    )
-
     return entities
 
 
-class OneWireProxySensor(OneWireProxyEntity):
+class OneWireSensor(OneWireBaseEntity, SensorEntity):
+    """Mixin for sensor specific attributes."""
+
+    @property
+    def unit_of_measurement(self) -> str | None:
+        """Return the unit the value is expressed in."""
+        return self._unit_of_measurement
+
+
+class OneWireProxySensor(OneWireProxyEntity, OneWireSensor):
     """Implementation of a 1-Wire sensor connected through owserver."""
 
     @property
@@ -403,7 +381,7 @@ class OneWireProxySensor(OneWireProxyEntity):
         return self._state
 
 
-class OneWireDirectSensor(OneWireBaseEntity):
+class OneWireDirectSensor(OneWireSensor):
     """Implementation of a 1-Wire sensor directly connected to RPI GPIO."""
 
     def __init__(self, name, device_file, device_info, owsensor):
@@ -416,11 +394,31 @@ class OneWireDirectSensor(OneWireBaseEntity):
         """Return the state of the entity."""
         return self._state
 
-    def update(self):
+    async def get_temperature(self):
+        """Get the latest data from the device."""
+        attempts = 1
+        while True:
+            try:
+                return await self.hass.async_add_executor_job(
+                    self._owsensor.get_temperature
+                )
+            except UnsupportResponseException as ex:
+                _LOGGER.debug(
+                    "Cannot read from sensor %s (retry attempt %s): %s",
+                    self._device_file,
+                    attempts,
+                    ex,
+                )
+                await asyncio.sleep(0.2)
+                attempts += 1
+                if attempts > 10:
+                    raise
+
+    async def async_update(self):
         """Get the latest data from the device."""
         value = None
         try:
-            self._value_raw = self._owsensor.get_temperature()
+            self._value_raw = await self.get_temperature()
             value = round(float(self._value_raw), 1)
         except (
             FileNotFoundError,
@@ -428,38 +426,4 @@ class OneWireDirectSensor(OneWireBaseEntity):
             UnsupportResponseException,
         ) as ex:
             _LOGGER.warning("Cannot read from sensor %s: %s", self._device_file, ex)
-        self._state = value
-
-
-class OneWireOWFSSensor(OneWireBaseEntity):  # pragma: no cover
-    """Implementation of a 1-Wire sensor through owfs.
-
-    This part of the implementation does not conform to policy regarding 3rd-party libraries, and will not longer be updated.
-    https://developers.home-assistant.io/docs/creating_platform_code_review/#5-communication-with-devicesservices
-    """
-
-    @property
-    def state(self) -> StateType:
-        """Return the state of the entity."""
-        return self._state
-
-    def _read_value_raw(self):
-        """Read the value as it is returned by the sensor."""
-        with open(self._device_file) as ds_device_file:
-            lines = ds_device_file.readlines()
-        return lines
-
-    def update(self):
-        """Get the latest data from the device."""
-        value = None
-        try:
-            value_read = self._read_value_raw()
-            if len(value_read) == 1:
-                value = round(float(value_read[0]), 1)
-                self._value_raw = float(value_read[0])
-        except ValueError:
-            _LOGGER.warning("Invalid value read from %s", self._device_file)
-        except FileNotFoundError:
-            _LOGGER.warning("Cannot read from sensor: %s", self._device_file)
-
         self._state = value

@@ -59,7 +59,6 @@ class UnifiFlowHandler(config_entries.ConfigFlow, domain=UNIFI_DOMAIN):
     """Handle a UniFi config flow."""
 
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
     @staticmethod
     @callback
@@ -192,8 +191,11 @@ class UnifiFlowHandler(config_entries.ConfigFlow, domain=UNIFI_DOMAIN):
             errors=errors,
         )
 
-    async def async_step_reauth(self, config_entry: dict):
+    async def async_step_reauth(self, data: dict):
         """Trigger a reauthentication flow."""
+        config_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
         self.reauth_config_entry = config_entry
 
         self.context["title_placeholders"] = {
@@ -297,6 +299,7 @@ class UnifiOptionsFlowHandler(config_entries.OptionsFlow):
                     ): cv.multi_select(clients_to_block),
                 }
             ),
+            last_step=True,
         )
 
     async def async_step_device_tracker(self, user_input=None):
@@ -319,7 +322,7 @@ class UnifiOptionsFlowHandler(config_entries.OptionsFlow):
                 if "name" in wlan
             }
         )
-        ssid_filter = {ssid: ssid for ssid in sorted(list(ssids))}
+        ssid_filter = {ssid: ssid for ssid in sorted(ssids)}
 
         return self.async_show_form(
             step_id="device_tracker",
@@ -352,6 +355,7 @@ class UnifiOptionsFlowHandler(config_entries.OptionsFlow):
                     ): bool,
                 }
             ),
+            last_step=False,
         )
 
     async def async_step_client_control(self, user_input=None):
@@ -389,6 +393,7 @@ class UnifiOptionsFlowHandler(config_entries.OptionsFlow):
                 }
             ),
             errors=errors,
+            last_step=False,
         )
 
     async def async_step_statistics_sensors(self, user_input=None):
@@ -411,6 +416,7 @@ class UnifiOptionsFlowHandler(config_entries.OptionsFlow):
                     ): bool,
                 }
             ),
+            last_step=True,
         )
 
     async def _update_options(self):

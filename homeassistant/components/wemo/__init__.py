@@ -109,11 +109,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         await hass.async_add_executor_job(registry.stop)
         wemo_discovery.async_stop_discovery()
 
-    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_stop_wemo)
+    entry.async_on_unload(
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_stop_wemo)
+    )
 
     static_conf = config.get(CONF_STATIC, [])
     if static_conf:
-        _LOGGER.debug("Adding statically configured WeMo devices...")
+        _LOGGER.debug("Adding statically configured WeMo devices")
         for device in await asyncio.gather(
             *[
                 hass.async_add_executor_job(validate_static_config, host, port)
@@ -190,7 +192,7 @@ class WemoDiscovery:
 
     async def async_discover_and_schedule(self, *_) -> None:
         """Periodically scan the network looking for WeMo devices."""
-        _LOGGER.debug("Scanning network for WeMo devices...")
+        _LOGGER.debug("Scanning network for WeMo devices")
         try:
             for device in await self._hass.async_add_executor_job(
                 pywemo.discover_devices

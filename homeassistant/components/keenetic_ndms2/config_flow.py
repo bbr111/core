@@ -1,5 +1,5 @@
 """Config flow for Keenetic NDMS2."""
-from typing import List
+from __future__ import annotations
 
 from ndms2_client import Client, ConnectionException, InterfaceInfo, TelnetConnection
 import voluptuous as vol
@@ -36,7 +36,6 @@ class KeeneticFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow."""
 
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
     @staticmethod
     @callback
@@ -103,7 +102,7 @@ class KeeneticOptionsFlowHandler(config_entries.OptionsFlow):
             ROUTER
         ]
 
-        interfaces: List[InterfaceInfo] = await self.hass.async_add_executor_job(
+        interfaces: list[InterfaceInfo] = await self.hass.async_add_executor_job(
             router.client.get_interfaces
         )
 

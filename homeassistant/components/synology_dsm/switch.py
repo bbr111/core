@@ -1,12 +1,14 @@
 """Support for Synology DSM switch."""
+from __future__ import annotations
+
 import logging
-from typing import Dict
 
 from synology_dsm.api.surveillance_station import SynoSurveillanceStation
 
 from homeassistant.components.switch import ToggleEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.typing import HomeAssistantType
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from . import SynoApi, SynologyDSMBaseEntity
@@ -16,7 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
-    hass: HomeAssistantType, entry: ConfigEntry, async_add_entities
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ) -> None:
     """Set up the Synology NAS switch."""
 
@@ -49,7 +51,7 @@ class SynoDSMSurveillanceHomeModeToggle(SynologyDSMBaseEntity, ToggleEntity):
         self,
         api: SynoApi,
         entity_type: str,
-        entity_info: Dict[str, str],
+        entity_info: dict[str, str],
         version: str,
         coordinator: DataUpdateCoordinator,
     ):
@@ -95,7 +97,7 @@ class SynoDSMSurveillanceHomeModeToggle(SynologyDSMBaseEntity, ToggleEntity):
         return bool(self._api.surveillance_station)
 
     @property
-    def device_info(self) -> Dict[str, any]:
+    def device_info(self) -> DeviceInfo:
         """Return the device information."""
         return {
             "identifiers": {

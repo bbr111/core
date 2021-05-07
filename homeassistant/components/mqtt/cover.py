@@ -20,11 +20,9 @@ from homeassistant.components.cover import (
     CoverEntity,
 )
 from homeassistant.const import (
-    CONF_DEVICE,
     CONF_DEVICE_CLASS,
     CONF_NAME,
     CONF_OPTIMISTIC,
-    CONF_UNIQUE_ID,
     CONF_VALUE_TEMPLATE,
     STATE_CLOSED,
     STATE_CLOSING,
@@ -32,10 +30,10 @@ from homeassistant.const import (
     STATE_OPENING,
     STATE_UNKNOWN,
 )
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.reload import async_setup_reload_service
-from homeassistant.helpers.typing import ConfigType, HomeAssistantType
+from homeassistant.helpers.typing import ConfigType
 
 from . import (
     CONF_COMMAND_TOPIC,
@@ -48,13 +46,7 @@ from . import (
 )
 from .. import mqtt
 from .debug_info import log_messages
-from .mixins import (
-    MQTT_AVAILABILITY_SCHEMA,
-    MQTT_ENTITY_DEVICE_INFO_SCHEMA,
-    MQTT_JSON_ATTRS_SCHEMA,
-    MqttEntity,
-    async_setup_entry_helper,
-)
+from .mixins import MQTT_ENTITY_COMMON_SCHEMA, MqttEntity, async_setup_entry_helper
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -128,7 +120,7 @@ def validate_options(value):
         and CONF_VALUE_TEMPLATE in value
     ):
         _LOGGER.warning(
-            "using 'value_template' for 'position_topic' is deprecated "
+            "Using 'value_template' for 'position_topic' is deprecated "
             "and will be removed from Home Assistant in version 2021.6, "
             "please replace it with 'position_template'"
         )
@@ -147,7 +139,6 @@ PLATFORM_SCHEMA = vol.All(
     mqtt.MQTT_BASE_PLATFORM_SCHEMA.extend(
         {
             vol.Optional(CONF_COMMAND_TOPIC): mqtt.valid_publish_topic,
-            vol.Optional(CONF_DEVICE): MQTT_ENTITY_DEVICE_INFO_SCHEMA,
             vol.Optional(CONF_DEVICE_CLASS): DEVICE_CLASSES_SCHEMA,
             vol.Optional(CONF_GET_POSITION_TOPIC): mqtt.valid_subscribe_topic,
             vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
@@ -183,20 +174,17 @@ PLATFORM_SCHEMA = vol.All(
             ): cv.boolean,
             vol.Optional(CONF_TILT_STATUS_TOPIC): mqtt.valid_subscribe_topic,
             vol.Optional(CONF_TILT_STATUS_TEMPLATE): cv.template,
-            vol.Optional(CONF_UNIQUE_ID): cv.string,
             vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
             vol.Optional(CONF_GET_POSITION_TEMPLATE): cv.template,
             vol.Optional(CONF_TILT_COMMAND_TEMPLATE): cv.template,
         }
-    )
-    .extend(MQTT_AVAILABILITY_SCHEMA.schema)
-    .extend(MQTT_JSON_ATTRS_SCHEMA.schema),
+    ).extend(MQTT_ENTITY_COMMON_SCHEMA.schema),
     validate_options,
 )
 
 
 async def async_setup_platform(
-    hass: HomeAssistantType, config: ConfigType, async_add_entities, discovery_info=None
+    hass: HomeAssistant, config: ConfigType, async_add_entities, discovery_info=None
 ):
     """Set up MQTT cover through configuration.yaml."""
     await async_setup_reload_service(hass, DOMAIN, PLATFORMS)
@@ -238,7 +226,6 @@ class MqttCover(MqttEntity, CoverEntity):
         return PLATFORM_SCHEMA
 
     def _setup_from_config(self, config):
-        self._config = config
         self._optimistic = config[CONF_OPTIMISTIC] or (
             config.get(CONF_STATE_TOPIC) is None
             and config.get(CONF_GET_POSITION_TOPIC) is None
@@ -280,15 +267,30 @@ class MqttCover(MqttEntity, CoverEntity):
                     payload
                 )
 
-            if payload.isnumeric() and (
+            if not payload:
+                _LOGGER.debug("Ignoring empty tilt message from '%s'", msg.topic)
+                return
+
+            if not payload.isnumeric():
+                _LOGGER.warning("Payload '%s' is not numeric", payload)
+            elif (
                 self._config[CONF_TILT_MIN]
                 <= int(payload)
                 <= self._config[CONF_TILT_MAX]
+                or self._config[CONF_TILT_MAX]
+                <= int(payload)
+                <= self._config[CONF_TILT_MIN]
             ):
-
                 level = self.find_percentage_in_range(float(payload))
                 self._tilt_value = level
                 self.async_write_ha_state()
+            else:
+                _LOGGER.warning(
+                    "Payload '%s' is out of range, must be between '%s' and '%s' inclusive",
+                    payload,
+                    self._config[CONF_TILT_MIN],
+                    self._config[CONF_TILT_MAX],
+                )
 
         @callback
         @log_messages(self.hass, self.entity_id)
@@ -298,6 +300,10 @@ class MqttCover(MqttEntity, CoverEntity):
             value_template = self._config.get(CONF_VALUE_TEMPLATE)
             if value_template is not None:
                 payload = value_template.async_render_with_possible_json_value(payload)
+
+            if not payload:
+                _LOGGER.debug("Ignoring empty state message from '%s'", msg.topic)
+                return
 
             if payload == self._config[CONF_STATE_STOPPED]:
                 if self._config.get(CONF_GET_POSITION_TOPIC) is not None:
@@ -342,6 +348,10 @@ class MqttCover(MqttEntity, CoverEntity):
 
             if template is not None:
                 payload = template.async_render_with_possible_json_value(payload)
+
+            if not payload:
+                _LOGGER.debug("Ignoring empty position message from '%s'", msg.topic)
+                return
 
             if payload.isnumeric():
                 percentage_payload = self.find_percentage_in_range(
@@ -398,11 +408,6 @@ class MqttCover(MqttEntity, CoverEntity):
     def assumed_state(self):
         """Return true if we do optimistic updates."""
         return self._optimistic
-
-    @property
-    def name(self):
-        """Return the name of the cover."""
-        return self._config[CONF_NAME]
 
     @property
     def is_closed(self):

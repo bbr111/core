@@ -6,6 +6,7 @@ import pytest
 import homeassistant.components.automation as automation
 from homeassistant.components.mqtt import DOMAIN, debug_info
 from homeassistant.components.mqtt.device_trigger import async_attach_trigger
+from homeassistant.helpers import device_registry as dr
 from homeassistant.setup import async_setup_component
 
 from tests.common import (
@@ -836,7 +837,7 @@ async def test_attach_remove_late2(hass, device_reg, mqtt_mock):
 
 async def test_entity_device_info_with_connection(hass, mqtt_mock):
     """Test MQTT device registry integration."""
-    registry = await hass.helpers.device_registry.async_get_registry()
+    registry = dr.async_get(hass)
 
     data = json.dumps(
         {
@@ -845,7 +846,7 @@ async def test_entity_device_info_with_connection(hass, mqtt_mock):
             "type": "foo",
             "subtype": "bar",
             "device": {
-                "connections": [["mac", "02:5b:26:a8:dc:12"]],
+                "connections": [[dr.CONNECTION_NETWORK_MAC, "02:5b:26:a8:dc:12"]],
                 "manufacturer": "Whatever",
                 "name": "Beer",
                 "model": "Glass",
@@ -856,9 +857,11 @@ async def test_entity_device_info_with_connection(hass, mqtt_mock):
     async_fire_mqtt_message(hass, "homeassistant/device_automation/bla/config", data)
     await hass.async_block_till_done()
 
-    device = registry.async_get_device(set(), {("mac", "02:5b:26:a8:dc:12")})
+    device = registry.async_get_device(
+        set(), {(dr.CONNECTION_NETWORK_MAC, "02:5b:26:a8:dc:12")}
+    )
     assert device is not None
-    assert device.connections == {("mac", "02:5b:26:a8:dc:12")}
+    assert device.connections == {(dr.CONNECTION_NETWORK_MAC, "02:5b:26:a8:dc:12")}
     assert device.manufacturer == "Whatever"
     assert device.name == "Beer"
     assert device.model == "Glass"
@@ -867,7 +870,7 @@ async def test_entity_device_info_with_connection(hass, mqtt_mock):
 
 async def test_entity_device_info_with_identifier(hass, mqtt_mock):
     """Test MQTT device registry integration."""
-    registry = await hass.helpers.device_registry.async_get_registry()
+    registry = dr.async_get(hass)
 
     data = json.dumps(
         {
@@ -898,7 +901,7 @@ async def test_entity_device_info_with_identifier(hass, mqtt_mock):
 
 async def test_entity_device_info_update(hass, mqtt_mock):
     """Test device registry update."""
-    registry = await hass.helpers.device_registry.async_get_registry()
+    registry = dr.async_get(hass)
 
     config = {
         "automation_type": "trigger",
@@ -907,7 +910,7 @@ async def test_entity_device_info_update(hass, mqtt_mock):
         "subtype": "bar",
         "device": {
             "identifiers": ["helloworld"],
-            "connections": [["mac", "02:5b:26:a8:dc:12"]],
+            "connections": [[dr.CONNECTION_NETWORK_MAC, "02:5b:26:a8:dc:12"]],
             "manufacturer": "Whatever",
             "name": "Beer",
             "model": "Glass",
@@ -1159,7 +1162,7 @@ async def test_trigger_debug_info(hass, mqtt_mock):
 
     This is a test helper for MQTT debug_info.
     """
-    registry = await hass.helpers.device_registry.async_get_registry()
+    registry = dr.async_get(hass)
 
     config = {
         "platform": "mqtt",
@@ -1168,7 +1171,7 @@ async def test_trigger_debug_info(hass, mqtt_mock):
         "type": "foo",
         "subtype": "bar",
         "device": {
-            "connections": [["mac", "02:5b:26:a8:dc:12"]],
+            "connections": [[dr.CONNECTION_NETWORK_MAC, "02:5b:26:a8:dc:12"]],
             "manufacturer": "Whatever",
             "name": "Beer",
             "model": "Glass",
@@ -1179,7 +1182,9 @@ async def test_trigger_debug_info(hass, mqtt_mock):
     async_fire_mqtt_message(hass, "homeassistant/device_automation/bla/config", data)
     await hass.async_block_till_done()
 
-    device = registry.async_get_device(set(), {("mac", "02:5b:26:a8:dc:12")})
+    device = registry.async_get_device(
+        set(), {(dr.CONNECTION_NETWORK_MAC, "02:5b:26:a8:dc:12")}
+    )
     assert device is not None
 
     debug_info_data = await debug_info.info_for_device(hass, device.id)

@@ -1,8 +1,9 @@
 """Support for Xiaomi Yeelight WiFi color bulb."""
+from __future__ import annotations
+
 import asyncio
 from datetime import timedelta
 import logging
-from typing import Optional
 
 import voluptuous as vol
 from yeelight import Bulb, BulbException, discover_bulbs
@@ -18,7 +19,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_connect, dispatcher_send
-from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.helpers.event import async_track_time_interval
 
 _LOGGER = logging.getLogger(__name__)
@@ -181,7 +182,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Yeelight from a config entry."""
 
-    async def _initialize(host: str, capabilities: Optional[dict] = None) -> None:
+    async def _initialize(host: str, capabilities: dict | None = None) -> None:
         remove_dispatcher = async_dispatcher_connect(
             hass,
             DEVICE_INITIALIZED.format(host),
@@ -197,11 +198,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await device.async_setup()
 
     async def _load_platforms():
-
-        for platform in PLATFORMS:
-            hass.async_create_task(
-                hass.config_entries.async_forward_entry_setup(entry, platform)
-            )
+        hass.config_entries.async_setup_platforms(entry, PLATFORMS)
 
     # Move options from data for imported entries
     # Initialize options with default values for other entries
@@ -243,15 +240,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Unload a config entry."""
-    unload_ok = all(
-        await asyncio.gather(
-            *[
-                hass.config_entries.async_forward_entry_unload(entry, platform)
-                for platform in PLATFORMS
-            ]
-        )
-    )
-
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         data = hass.data[DOMAIN][DATA_CONFIG_ENTRIES].pop(entry.entry_id)
         remove_init_dispatcher = data.get(DATA_REMOVE_INIT_DISPATCHER)
@@ -318,7 +307,7 @@ class YeelightScanner:
                     if len(self._callbacks) == 0:
                         self._async_stop_scan()
 
-        await asyncio.sleep(SCAN_INTERVAL.seconds)
+        await asyncio.sleep(SCAN_INTERVAL.total_seconds())
         self._scan_task = self._hass.loop.create_task(self._async_scan())
 
     @callback
@@ -564,7 +553,7 @@ class YeelightEntity(Entity):
         return self._unique_id
 
     @property
-    def device_info(self) -> dict:
+    def device_info(self) -> DeviceInfo:
         """Return the device info."""
         return {
             "identifiers": {(DOMAIN, self._unique_id)},
@@ -593,7 +582,7 @@ async def _async_get_device(
     hass: HomeAssistant,
     host: str,
     entry: ConfigEntry,
-    capabilities: Optional[dict],
+    capabilities: dict | None,
 ) -> YeelightDevice:
     # Get model from config and capabilities
     model = entry.options.get(CONF_MODEL)

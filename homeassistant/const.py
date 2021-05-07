@@ -1,6 +1,8 @@
 """Constants used by Home Assistant components."""
+from typing import Final
+
 MAJOR_VERSION = 2021
-MINOR_VERSION = 4
+MINOR_VERSION = 6
 PATCH_VERSION = "0.dev0"
 __short_version__ = f"{MAJOR_VERSION}.{MINOR_VERSION}"
 __version__ = f"{__short_version__}.{PATCH_VERSION}"
@@ -21,6 +23,10 @@ ENTITY_MATCH_ALL = "all"
 
 # If no name is specified
 DEVICE_DEFAULT_NAME = "Unnamed Device"
+
+# Max characters for an event_type (changing this requires a recorder
+# database migration)
+MAX_LENGTH_EVENT_TYPE = 64
 
 # Sun events
 SUN_EVENT_SUNSET = "sunset"
@@ -73,6 +79,7 @@ CONF_CUSTOMIZE_GLOB = "customize_glob"
 CONF_DEFAULT = "default"
 CONF_DELAY = "delay"
 CONF_DELAY_TIME = "delay_time"
+CONF_DESCRIPTION = "description"
 CONF_DEVICE = "device"
 CONF_DEVICES = "devices"
 CONF_DEVICE_CLASS = "device_class"
@@ -284,7 +291,7 @@ ATTR_SERVICE_DATA = "service_data"
 ATTR_ID = "id"
 
 # Name
-ATTR_NAME = "name"
+ATTR_NAME: Final = "name"
 
 # Contains one string or a list of strings, each being an entity id
 ATTR_ENTITY_ID = "entity_id"
@@ -300,6 +307,8 @@ ATTR_FRIENDLY_NAME = "friendly_name"
 
 # A picture to represent entity
 ATTR_ENTITY_PICTURE = "entity_picture"
+
+ATTR_IDENTIFIERS: Final = "identifiers"
 
 # Icon to use in the frontend
 ATTR_ICON = "icon"
@@ -317,6 +326,10 @@ ATTR_VOLTAGE = "voltage"
 ATTR_LOCATION = "location"
 
 ATTR_MODE = "mode"
+
+ATTR_MANUFACTURER: Final = "manufacturer"
+ATTR_MODEL: Final = "model"
+ATTR_SW_VERSION: Final = "sw_version"
 
 ATTR_BATTERY_CHARGING = "battery_charging"
 ATTR_BATTERY_LEVEL = "battery_level"

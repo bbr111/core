@@ -1,8 +1,10 @@
 """Provide functionality to record stream."""
+from __future__ import annotations
+
+from collections import deque
 import logging
 import os
 import threading
-from typing import Deque, List
 
 import av
 
@@ -19,7 +21,7 @@ def async_setup_recorder(hass):
     """Only here so Provider Registry works."""
 
 
-def recorder_save_worker(file_out: str, segments: Deque[Segment]):
+def recorder_save_worker(file_out: str, segments: deque[Segment]):
     """Handle saving stream."""
 
     if not segments:
@@ -115,7 +117,7 @@ class RecorderOutput(StreamOutput):
         """Return provider name."""
         return "recorder"
 
-    def prepend(self, segments: List[Segment]) -> None:
+    def prepend(self, segments: list[Segment]) -> None:
         """Prepend segments to existing list."""
         self._segments.extendleft(reversed(segments))
 
