@@ -91,9 +91,16 @@ ZEROCONF = {
     "_homekit._tcp.local.": [
         {
             "domain": "homekit"
+        },
+        {
+            "domain": "icloud"
         }
     ],
     "_http._tcp.local.": [
+        {
+            "domain": "bosch_shc",
+            "name": "bosch shc*"
+        },
         {
             "domain": "nam",
             "name": "nam-*"
@@ -153,6 +160,11 @@ ZEROCONF = {
     "_plugwise._tcp.local.": [
         {
             "domain": "plugwise"
+        }
+    ],
+    "_powerview._tcp.local.": [
+        {
+            "domain": "hunterdouglas_powerview"
         }
     ],
     "_printer._tcp.local.": [
@@ -232,6 +244,7 @@ HOMEKIT = {
     "Touch HD": "rainmachine",
     "Welcome": "netatmo",
     "Wemo": "wemo",
+    "YLDP*": "yeelight",
     "iSmartGate": "gogogate2",
     "iZone": "izone",
     "tado": "tado"
